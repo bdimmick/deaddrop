@@ -13,18 +13,15 @@ class DeaddropProtocol(protocol.Protocol):
     self.destination = None
     self.count = 0
 
-  def filename(self):
-    return "%s@%s" % (self.transport.getPeer().host, strftime("%Y%m%d%H%M%S"))
-
   def connectionMade(self):
-    self.destination = open(path.join(self.factory.root, self.filename()), "w")
+    filename = "%s@%s" % (self.transport.getPeer().host, strftime("%Y%m%d%H%M%S"))
+    self.destination = open(path.join(self.factory.root, filename), "w")
 
   def dataReceived(self, data):
     self.destination.write(data)
     self.count += len(data)
     if self.count > self.factory.maxlen:
       self.transport.loseConnection()
-
 
   def connectionLost(self, reason):
     self.destination.close()
@@ -37,30 +34,33 @@ class DeaddropFactory(protocol.ServerFactory):
     self.root = root
     self.maxlen = maxlen
 
+
 SIZES = {
   'K': 1024,
   'M': 1024 * 1024,
   'G': 1024 * 1024 * 1024
 }
 
-def byteLength(s):
-  if len(s) is 0:
+
+def byteLength(value):
+  if not value:
     return 0
 
-  suffix = s[-1:].upper()
+  suffix = value[-1:].upper()
   try:
     if suffix in digits:
-      return int(s)
+      return int(value)
     if suffix in SIZES:
-      return SIZES[suffix] * int(s[:-1])
+      return SIZES[suffix] * int(value[:-1])
   except ValueError:
     pass
-  raise ValueError("Provided value '%s' is not a value size in bytes." % s)
+  raise ValueError("Provided value '%s' is not a value size in bytes." % value)
 
 
 def start(port=4233, root='/tmp', debug=False, maxlen='1M'):
   reactor.listenTCP(port, DeaddropFactory(root, byteLength(maxlen)))
   reactor.run()
+
 
 def parse_args():
   parser = ArgumentParser(description = 'Starts a deaddrop server on this host.')
